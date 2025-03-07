@@ -1,0 +1,53 @@
+# 还没写完，就是临时debug的版本
+FROM python:3.10-buster
+
+# 设置工作目录
+ENV SERVER_DIR=/app
+WORKDIR $SERVER_DIR
+
+# 更换为阿里云的镜像源
+RUN echo "deb http://mirrors.aliyun.com/debian/ buster main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian/ buster-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security buster/updates main contrib non-free" >> /etc/apt/sources.list
+
+
+# 安装必要的构建工具
+RUN apt-get update 
+
+
+# 复制项目依赖文件到工作目录
+COPY requirements.txt .
+
+
+# 安装必要的构建工具和 OpenFst
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libfst-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# 更新 pip
+RUN pip install --upgrade pip
+
+
+# 安装 Cython 和 pynini
+RUN  pip install Cython -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+RUN  pip install pynini==2.1.5 -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+
+# 安装项目依赖
+RUN pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com \
+    && rm -rf /root/.cache/pip
+
+
+# 复制整个项目到工作目录
+COPY . .
+# 其中也包括了模型文件，就是pretrained_models里面的东西
+# 也就是说本地要在执行dockerfile之前把模型下载过来，需要docker build环境执行before-dockerfile-model-download.py
+
+# 暴露端口
+EXPOSE 8001
+
+# 运行项目
+CMD ["python3", "webui.py", "--port", "8001"]

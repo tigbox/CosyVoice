@@ -1,0 +1,48 @@
+# 使用带有 conda 的基础镜像
+FROM continuumio/miniconda3
+
+# 设置工作目录
+ENV SERVER_DIR=/app
+WORKDIR $SERVER_DIR
+
+# 更换为阿里云的镜像源
+RUN echo "deb http://mirrors.aliyun.com/debian/ buster main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian/ buster-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security buster/updates main contrib non-free" >> /etc/apt/sources.list
+
+# 安装必要的构建工具
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建 conda 环境并安装 pynini
+# RUN conda create -n myenv -y python=3.10 
+# # Make RUN commands use the new environment:
+# SHELL ["conda", "run","-n", "myenv", "/bin/bash", "-c"]
+# RUN conda activate myenv
+# RUN conda install -y -c conda-forge pynini==2.1.5
+RUN conda init bash \
+    && . ~/.bashrc \
+    && conda create -n myenv -y python=3.10 \
+    && conda activate myenv \
+    && conda install -y -c conda-forge pynini==2.1.5
+
+# 复制项目依赖文件到工作目录
+COPY requirements.txt .
+
+# 安装项目依赖
+RUN pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com \
+    && rm -rf /root/.cache/pip
+
+# 复制整个项目到工作目录
+COPY . .
+# 其中也包括了模型文件，就是pretrained_models里面的东西
+# 也就是说本地要在执行dockerfile之前把模型下载过来，需要docker build环境执行before-dockerfile-model-download.py
+
+# 暴露端口
+EXPOSE 8001
+
+# 运行项目
+CMD ["python3", "webui.py", "--port", "8001"]
